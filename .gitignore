@@ -1,0 +1,24 @@
+# Environment variables with sensitive data
+.env
+
+# Docker volumes and data directories
+jellyfin/
+transmission/
+wordpress/
+mysql/
+nginx-proxy/
+
+# Except keep the cron config structure
+!cron/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Backup files
+*.tar.gz
+*.sql
+*.bak
