@@ -97,7 +97,7 @@ case $choice in
         echo -e "${BLUE}📋 Next steps:${NC}"
         echo "1. Open Nginx Proxy Manager: http://localhost:81"
         echo "2. Default credentials: admin@example.com / changeme"
-        echo "3. Create Proxy Hosts for each service"
+        echo "3. Re-run auto-setup.sh to regenerate the Caddyfile"
         echo ""
         ;;
 
@@ -124,7 +124,6 @@ case $choice in
         echo "A       jellyfin.$domain        $(curl -s ifconfig.me)"
         echo "A       transmission.$domain    $(curl -s ifconfig.me)"
         echo "A       wordpress.$domain       $(curl -s ifconfig.me)"
-        echo "A       npm.$domain             $(curl -s ifconfig.me)"
         echo ""
         echo "Or use a wildcard:"
         echo "A       *.$domain               $(curl -s ifconfig.me)"
@@ -143,8 +142,7 @@ case $choice in
         echo ""
         echo -e "${BLUE}📋 Next steps:${NC}"
         echo "1. Wait for DNS propagation (check with: nslookup jellyfin.$domain)"
-        echo "2. Open Nginx Proxy Manager: http://$(curl -s ifconfig.me):81"
-        echo "3. Create Proxy Hosts with Let's Encrypt SSL"
+        echo "2. Run: ./bin/auto-setup.sh (will regenerate Caddyfile and configure Jellyfin)"
         echo ""
         ;;
 
@@ -188,37 +186,9 @@ case $choice in
 
     4)
         echo ""
-        echo -e "${BLUE}╔════════════════════════════════════════════════╗${NC}"
-        echo -e "${BLUE}║   Self-Signed Certificate Generator          ║${NC}"
-        echo -e "${BLUE}╚════════════════════════════════════════════════╝${NC}"
-        echo ""
-
-        read -p "Domain (e.g. *.local): " cert_domain
-
-        if [ -z "$cert_domain" ]; then
-            cert_domain="*.local"
-        fi
-
-        OUTPUT_DIR="./nginx-proxy/certs"
-        mkdir -p "$OUTPUT_DIR"
-
-        echo -e "${YELLOW}Generating certificate for $cert_domain...${NC}"
-
-        openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
-            -keyout "$OUTPUT_DIR/private.key" \
-            -out "$OUTPUT_DIR/certificate.crt" \
-            -subj "/C=US/ST=State/L=City/O=Dev/CN=$cert_domain" \
-            2>/dev/null
-
-        echo -e "${GREEN}✓ Certificate generated${NC}"
-        echo ""
-        echo "Files created:"
-        echo "• Certificate: $OUTPUT_DIR/certificate.crt"
-        echo "• Private key: $OUTPUT_DIR/private.key"
-        echo ""
-        echo "Import these files in Nginx Proxy Manager:"
-        echo "1. SSL Certificates → Add SSL Certificate → Custom"
-        echo "2. Paste the file contents"
+        echo -e "${YELLOW}⚠️  Self-signed certificates are no longer needed.${NC}"
+        echo -e "Caddy handles HTTPS automatically via Let's Encrypt."
+        echo -e "Set ENABLE_SSL=true and a public domain in .env, then run: ./bin/auto-setup.sh"
         echo ""
         ;;
 
@@ -232,14 +202,8 @@ case $choice in
         IP=$(curl -s ifconfig.me)
 
         echo -e "${BLUE}🌐 Direct access (no domain):${NC}"
-        echo "• Jellyfin:              http://localhost:8096"
-        echo "• Transmission:          http://localhost:9091"
-        echo "• WordPress:             http://localhost:8080"
-        echo "• Nginx Proxy Manager:   http://localhost:81"
-        echo ""
-
-        echo -e "${BLUE}🌍 Internet access (if configured):${NC}"
-        echo "• Nginx Proxy Manager:   http://$IP:81"
+        echo "• Jellyfin:        http://localhost:8096"
+        echo "• Transmission:    http://localhost:9091"
         echo ""
 
         echo -e "${BLUE}🔑 Default credentials:${NC}"

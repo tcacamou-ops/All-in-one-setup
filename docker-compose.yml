@@ -39,7 +39,7 @@ services:
       - ./transmission/config:/config
       - ./transmission/watch:/watch
       - ${MEDIA_PATH}:/downloads
-    # 9091 removed: NPM handles external access via media-network
+    # 9091 not exposed: Caddy handles external access via media-network
     # 51413 kept: inbound BitTorrent port (required for peers)
     ports:
       - "51413:51413"
@@ -87,21 +87,21 @@ services:
   #     - socket-proxy-network
 
   # MySQL Database for WordPress
-  mysql:
-    image: mysql:8.0
-    container_name: mysql-wordpress
-    environment:
-      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD:-rootpassword}
-      - MYSQL_DATABASE=${MYSQL_DATABASE:-wordpress}
-      - MYSQL_USER=${MYSQL_USER:-wordpress}
-      - MYSQL_PASSWORD=${MYSQL_PASSWORD:-wordpress}
-    volumes:
-      - ./mysql/data:/var/lib/mysql
-    security_opt:
-      - no-new-privileges:true
-    restart: unless-stopped
-    networks:
-      - wordpress-network
+#   mysql:
+#     image: mysql:8.0
+#     container_name: mysql-wordpress
+#     environment:
+#       - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD:-rootpassword}
+#       - MYSQL_DATABASE=${MYSQL_DATABASE:-wordpress}
+#       - MYSQL_USER=${MYSQL_USER:-wordpress}
+#       - MYSQL_PASSWORD=${MYSQL_PASSWORD:-wordpress}
+#     volumes:
+#       - ./mysql/data:/var/lib/mysql
+#     security_opt:
+#       - no-new-privileges:true
+#     restart: unless-stopped
+#     networks:
+#       - wordpress-network
 
   # WordPress Application
   # wordpress:
@@ -125,10 +125,10 @@ services:
   #   networks:
   #     - wordpress-network
 
-  # Nginx Proxy Manager (for domains and SSL certificates)
-  nginx-proxy:
-    image: jc21/nginx-proxy-manager:latest
-    container_name: nginx-proxy-manager
+  # Caddy — reverse proxy with automatic HTTPS (Let's Encrypt)
+  caddy:
+    image: caddy:latest
+    container_name: caddy
     depends_on:
       - jellyfin
       # - transmission
@@ -136,14 +136,13 @@ services:
     ports:
       - "80:80"
       - "443:443"
-      - "81:81"   # Admin interface — bind to 127.0.0.1:81 if the server is publicly exposed
+      - "443:443/udp"   # HTTP/3 (QUIC)
     security_opt:
       - no-new-privileges:true
-    environment:
-      - DB_SQLITE_FILE=/data/database.sqlite
     volumes:
-      - ./nginx-proxy/data:/data
-      - ./nginx-proxy/letsencrypt:/etc/letsencrypt
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./caddy/data:/data
+      - ./caddy/config:/config
     restart: unless-stopped
     networks:
       - media-network
@@ -164,5 +163,5 @@ volumes:
   transmission-config:
   mysql-data:
   wordpress-html:
-  nginx-data:
-  nginx-letsencrypt:
+  caddy-data:
+  caddy-config:

@@ -8,9 +8,9 @@ A complete Docker Compose stack for a personal media and web server.
 |---------|-------------|------|
 | **Jellyfin** | Media server (movies, TV shows) | 8096 |
 | **Transmission** | BitTorrent client | 9091 |
-| **WordPress** | CMS with MySQL database | 8080 |
-| **Nginx Proxy Manager** | Reverse proxy + Let's Encrypt SSL | 80 / 443 / 81 |
-| **Ofelia** | Docker cron job manager | — |
+| **WordPress** | CMS with MySQL database | — (commented) |
+| **Caddy** | Reverse proxy + automatic HTTPS (Let's Encrypt) | 80 / 443 |
+| **Ofelia** | Docker cron job manager | — (commented) |
 
 ## Prerequisites
 
@@ -52,15 +52,11 @@ DOMAIN_BASE=local                              # or yourdomain.com in production
 DOMAIN_JELLYFIN=jellyfin.${DOMAIN_BASE}
 DOMAIN_TRANSMISSION=transmission.${DOMAIN_BASE}
 DOMAIN_WORDPRESS=wordpress.${DOMAIN_BASE}
-DOMAIN_NPM=npm.${DOMAIN_BASE}
 
 # SSL (requires a public domain)
+# Set to false for local development — Caddy will disable HTTPS automatically
 ENABLE_SSL=false
 LETSENCRYPT_EMAIL=contact@yourdomain.com
-
-# Nginx Proxy Manager admin
-NPM_ADMIN_EMAIL=admin@example.com
-NPM_ADMIN_PASSWORD=changeme
 
 # Jellyfin admin
 JELLYFIN_ADMIN_USER=admin
@@ -79,12 +75,11 @@ sudo bin/auto-setup.sh
 ```
 
 `bin/auto-setup.sh` automatically:
+- ✓ Generates `caddy/Caddyfile` from `.env` (HTTP or HTTPS depending on `ENABLE_SSL`)
 - ✓ Creates the media folders with correct permissions
-- ✓ Starts all Docker containers
 - ✓ Configures `/etc/hosts` for local domains
-- ✓ Creates proxy hosts in Nginx Proxy Manager
+- ✓ Starts all Docker containers (`docker compose up -d`)
 - ✓ Performs the initial Jellyfin setup (admin account + libraries)
-- ✓ Enables Let's Encrypt if `ENABLE_SSL=true`
 
 ## Accessing Services
 
@@ -93,16 +88,14 @@ sudo bin/auto-setup.sh
 - **Jellyfin**: http://jellyfin.local
 - **Transmission**: http://transmission.local
 - **WordPress**: http://wordpress.local
-- **Nginx Proxy Manager**: http://localhost:81
 
 ### Production (`DOMAIN_BASE=yourdomain.com`)
 
 - **Jellyfin**: https://jellyfin.yourdomain.com
 - **Transmission**: https://transmission.yourdomain.com
 - **WordPress**: https://wordpress.yourdomain.com
-- **Nginx Proxy Manager**: http://npm.yourdomain.com
 
-> Default Nginx Proxy Manager credentials: `admin@example.com` / `changeme` — change them on first login.
+> HTTPS certificates are managed automatically by Caddy (Let's Encrypt). No manual configuration required.
 
 ## Shared Folders
 
@@ -135,11 +128,13 @@ Main script that orchestrates the entire configuration. Re-run after any `.env` 
 bin/setups/setup-jellyfin.sh
 ```
 
-### `bin/setups/auto-configure-npm.py` — Reconfigure Nginx Proxy Manager only
+### `bin/setups/setup-caddy.sh` — Regenerate Caddyfile only
 
 ```bash
-python3 bin/setups/auto-configure-npm.py
+bash bin/setups/setup-caddy.sh
 ```
+
+Generates `caddy/Caddyfile` from `.env`. Run this if you change domains or SSL settings without running the full setup.
 
 ### `bin/setups/auto-configure-jellyfin.py` — Reconfigure Jellyfin only (Python)
 
@@ -150,10 +145,10 @@ python3 bin/setups/auto-configure-jellyfin.py
 ### `bin/setups/setup-domains.sh` — Interactive manual configuration
 
 ```bash
-bin/setups/setup-domains.sh
+bash bin/setups/setup-domains.sh
 ```
 
-Interactive menu: local/production setup, service health check, self-signed certificates.
+Interactive menu: local/production setup, DNS instructions, service health check.
 
 ### Reset scripts
 
@@ -161,7 +156,6 @@ Interactive menu: local/production setup, service health check, self-signed cert
 |--------|--------|
 | `bin/reset-all.sh` | **Full** reset (removes everything) |
 | `bin/resets/reset-jellyfin.sh` | Reset Jellyfin only |
-| `bin/resets/reset-npm.sh` | Reset Nginx Proxy Manager only |
 | `bin/resets/reset-transmission.sh` | Reset Transmission only |
 
 > ⚠️ Reset scripts are irreversible. Files in `MEDIA_PATH` are never deleted.
@@ -208,7 +202,7 @@ docker compose pull && docker compose up -d
 
 # Backup data (excluding media files)
 docker compose down
-tar -czf backup-$(date +%Y%m%d).tar.gz jellyfin/config transmission/config wordpress/ mysql/ nginx-proxy/
+tar -czf backup-$(date +%Y%m%d).tar.gz jellyfin/config transmission/config wordpress/ mysql/ caddy/
 docker compose up -d
 ```
 
@@ -221,19 +215,21 @@ All-in-one-setup/
 ├── .env.example
 ├── requirements.txt
 ├── README.md
-├── QUICKSTART.md
 ├── bin/
 │   ├── auto-setup.sh       ← main script
 │   ├── reset-all.sh
 │   ├── resets/
 │   │   ├── reset-jellyfin.sh
-│   │   ├── reset-npm.sh
 │   │   └── reset-transmission.sh
 │   └── setups/
 │       ├── auto-configure-jellyfin.py
-│       ├── auto-configure-npm.py
+│       ├── setup-caddy.sh      ← generates caddy/Caddyfile
 │       ├── setup-domains.sh
 │       └── setup-jellyfin.sh
+├── caddy/
+│   ├── Caddyfile           ← generated (git-ignored)
+│   ├── data/               ← certificates (git-ignored)
+│   └── config/             ← caddy internal state (git-ignored)
 ├── cron/
 │   └── config.ini
 ├── jellyfin/
@@ -247,20 +243,17 @@ All-in-one-setup/
 │   ├── plugins/
 │   ├── themes/
 │   └── uploads/
-├── mysql/
-│   └── data/
-└── nginx-proxy/
-    ├── data/
-    └── letsencrypt/
+└── mysql/
+    └── data/
 ```
 
 ## Network Architecture
 
 Two Docker networks are created:
-- `media-network`: Jellyfin, Transmission, Nginx Proxy Manager
-- `wordpress-network`: WordPress, MySQL, Nginx Proxy Manager
+- `media-network`: Jellyfin, Transmission, Caddy
+- `wordpress-network`: WordPress, MySQL, Caddy
 
-This separation isolates WordPress from the media network while allowing the proxy to reach all services.
+This separation isolates WordPress from the media network while allowing Caddy to reach all services.
 
 ## Troubleshooting
 
@@ -288,25 +281,46 @@ ports:
 pip3 install -r requirements.txt
 ```
 
-### NPM not responding
+### HTTP 308 redirect loop (local mode)
+
+In local mode (`ENABLE_SSL=false`), Caddy may redirect HTTP → HTTPS if its internal state cache retains a previous HTTPS session. The generated Caddyfile uses an explicit `http://` prefix to prevent this. If the issue persists:
 
 ```bash
-docker compose ps nginx-proxy
-docker compose restart nginx-proxy
-# Wait ~30 seconds then re-run bin/auto-setup.sh
+# Clear Caddy's internal state and restart
+docker compose stop caddy
+sudo rm -rf caddy/data caddy/config
+docker compose up -d caddy
+```
+
+Also clear the browser cache or do a hard refresh (`Ctrl+Shift+R`) to purge any HSTS entry stored by the browser.
+
+### Caddyfile not generated
+
+```bash
+bash bin/setups/setup-caddy.sh
+# Then reload Caddy:
+docker compose exec caddy caddy reload --config /etc/caddy/Caddyfile
+```
+
+### Caddy not responding or certificate error
+
+```bash
+docker compose ps caddy
+docker compose logs --tail=50 caddy
+# Wait a few seconds for Let's Encrypt — then check again
 ```
 
 ### View container logs
 
 ```bash
-docker compose logs --tail=50 [jellyfin|transmission|nginx-proxy|wordpress|mysql]
+docker compose logs --tail=50 [jellyfin|transmission|caddy|wordpress|mysql]
 ```
 
 ## Security Recommendations
 
 1. Change all default passwords in `.env`
-2. Never expose service ports directly — use Nginx Proxy Manager instead
-3. Enable SSL (`ENABLE_SSL=true`) with a public domain
+2. Never expose service ports directly — use Caddy instead
+3. Enable SSL (`ENABLE_SSL=true`) with a public domain (Caddy handles Let's Encrypt automatically)
 4. Update images regularly: `docker compose pull && docker compose up -d`
 5. Back up your data regularly using the backup command above
 
@@ -316,5 +330,5 @@ For issues specific to each service:
 - Jellyfin: https://jellyfin.org/docs/
 - Transmission: https://transmissionbt.com/
 - WordPress: https://wordpress.org/support/
-- Nginx Proxy Manager: https://nginxproxymanager.com/
+- Caddy: https://caddyserver.com/docs/
 - Ofelia: https://github.com/mcuadros/ofelia
