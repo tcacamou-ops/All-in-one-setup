@@ -13,7 +13,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
 
 echo -e "${BLUE}╔════════════════════════════════════════════════╗${NC}"
-echo -e "${BLUE}║   Jellyfin Setup                              ║${NC}"
+echo -e "${BLUE}║   Jellyfin Setup                               ║${NC}"
 echo -e "${BLUE}╚════════════════════════════════════════════════╝${NC}"
 echo ""
 
@@ -61,11 +61,11 @@ echo ""
 
 if [ $EXIT_CODE -eq 0 ]; then
     echo -e "${GREEN}╔════════════════════════════════════════════════╗${NC}"
-    echo -e "${GREEN}║   ✓ Jellyfin setup complete!                  ║${NC}"
+    echo -e "${GREEN}║   ✓ Jellyfin setup complete!                   ║${NC}"
     echo -e "${GREEN}╚════════════════════════════════════════════════╝${NC}"
 else
     echo -e "${RED}╔════════════════════════════════════════════════╗${NC}"
-    echo -e "${RED}║   ✗ Setup encountered an error                ║${NC}"
+    echo -e "${RED}║   ✗ Setup encountered an error                 ║${NC}"
     echo -e "${RED}╚════════════════════════════════════════════════╝${NC}"
     exit 1
 fi

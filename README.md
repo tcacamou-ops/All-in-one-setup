@@ -1,16 +1,18 @@
 # All-in-One Docker Setup
 
-A complete Docker Compose stack for a personal media and web server.
+A fully automated Docker Compose stack for a personal media and download server. A single command bootstraps everything: reverse proxy, media folders, Jellyfin configuration, WordPress installation, and all plugins.
 
 ## Included Services
 
-| Service | Description | Port |
-|---------|-------------|------|
-| **Jellyfin** | Media server (movies, TV shows) | 8096 |
-| **Transmission** | BitTorrent client | 9091 |
-| **WordPress** | CMS with MySQL database | — (commented) |
-| **Caddy** | Reverse proxy + automatic HTTPS (Let's Encrypt) | 80 / 443 |
-| **Ofelia** | Docker cron job manager | — (commented) |
+| Service | Image | Description | Exposed port |
+|---------|-------|-------------|--------------|
+| **Jellyfin** | `jellyfin/jellyfin:latest` | Media server (movies, TV shows) | `127.0.0.1:8096` (local only) |
+| **Transmission** | `linuxserver/transmission:latest` | BitTorrent client | `51413` (peers), UI via Caddy |
+| **WordPress** | `wordpress:latest` | Download portal (latest WP) | via Caddy |
+| **MySQL** | `mysql:8.0` | WordPress database | internal |
+| **Caddy** | `caddy:latest` | Reverse proxy + automatic HTTPS | `80`, `443`, `443/udp` (HTTP/3) |
+| **Ofelia** | `mcuadros/ofelia:latest` | Docker cron job manager | internal |
+| **docker-socket-proxy** | `tecnativa/docker-socket-proxy:latest` | Secure minimal Docker socket exposure for Ofelia | internal |
 
 ## Prerequisites
 
@@ -40,31 +42,51 @@ TZ=Europe/Paris
 MEDIA_PATH=/datadisk/Media
 
 # Transmission credentials
-TRANSMISSION_USER=admin
+TRANSMISSION_USER=download
 TRANSMISSION_PASS=change_this_password
 
 # WordPress database
-MYSQL_ROOT_PASSWORD=secure_root_password_here
-MYSQL_PASSWORD=secure_wordpress_password_here
+MYSQL_ROOT_PASSWORD=secure_root_password
+MYSQL_DATABASE=wordpress
+MYSQL_USER=wpUser
+MYSQL_PASSWORD=secure_wp_db_password
 
-# Domains
-DOMAIN_BASE=local                              # or yourdomain.com in production
+# Domains (use .local for dev, real domain for production)
+DOMAIN_BASE=local
 DOMAIN_JELLYFIN=jellyfin.${DOMAIN_BASE}
 DOMAIN_TRANSMISSION=transmission.${DOMAIN_BASE}
-DOMAIN_WORDPRESS=wordpress.${DOMAIN_BASE}
+DOMAIN_WORDPRESS=downloads.${DOMAIN_BASE}
 
-# SSL (requires a public domain)
-# Set to false for local development — Caddy will disable HTTPS automatically
+# SSL (requires a public domain pointing to this server)
 ENABLE_SSL=false
 LETSENCRYPT_EMAIL=contact@yourdomain.com
 
 # Jellyfin admin
 JELLYFIN_ADMIN_USER=admin
-JELLYFIN_ADMIN_PASSWORD=
+JELLYFIN_ADMIN_PASSWORD=change_this_password
 
-# Jellyfin libraries (format: Name:type:SubFolder)
+# Jellyfin libraries (format: DisplayName:type:SubFolder, comma-separated)
 # Available types: movies, tvshows, music, books, photos
 JELLYFIN_LIBRARIES="Movies:movies:Movies,TV Shows:tvshows:TvShows,Kids Movies:movies:KidsMovies,Kids Shows:tvshows:KidsTvShows"
+
+# WordPress admin
+WP_ADMIN_USER=admin
+WP_ADMIN_PASSWORD=change_this_password
+WP_ADMIN_EMAIL=admin@example.com
+WP_SITE_TITLE="My Download Site"
+
+# WordPress HTTP Basic Auth (optional — leave empty to disable)
+WP_HTTP_AUTH_USER=
+WP_HTTP_AUTH_PASSWORD=
+
+# All-in-one-download plugin — paths relative to $MEDIA_PATH inside the container
+AIO_MOVIE_DIRECTORY=downloads/Movies
+AIO_TV_SHOW_DIRECTORY=downloads/TvShows
+
+# Plugin credentials (optional — leave empty to skip)
+TORR9_API_KEY=
+TORR9_FULL_TOKEN=
+C411_API_KEY=
 ```
 
 ### 2. Run the automated setup
@@ -75,11 +97,13 @@ sudo bin/auto-setup.sh
 ```
 
 `bin/auto-setup.sh` automatically:
+- ✓ Validates `.env` and checks dependencies
 - ✓ Generates `caddy/Caddyfile` from `.env` (HTTP or HTTPS depending on `ENABLE_SSL`)
-- ✓ Creates the media folders with correct permissions
-- ✓ Configures `/etc/hosts` for local domains
+- ✓ Creates media sub-folders with correct `PUID:PGID` ownership and `775` permissions
+- ✓ Adds `.local` domains to `/etc/hosts` (only when `DOMAIN_BASE=local`)
 - ✓ Starts all Docker containers (`docker compose up -d`)
-- ✓ Performs the initial Jellyfin setup (admin account + libraries)
+- ✓ Configures Jellyfin via REST API (admin account + libraries)
+- ✓ Installs and configures WordPress + all plugins via WP-CLI
 
 ## Accessing Services
 
@@ -87,46 +111,57 @@ sudo bin/auto-setup.sh
 
 - **Jellyfin**: http://jellyfin.local
 - **Transmission**: http://transmission.local
-- **WordPress**: http://wordpress.local
+- **WordPress**: http://downloads.local
 
 ### Production (`DOMAIN_BASE=yourdomain.com`)
 
 - **Jellyfin**: https://jellyfin.yourdomain.com
 - **Transmission**: https://transmission.yourdomain.com
-- **WordPress**: https://wordpress.yourdomain.com
+- **WordPress**: https://downloads.yourdomain.com
 
 > HTTPS certificates are managed automatically by Caddy (Let's Encrypt). No manual configuration required.
 
+## WordPress Plugins
+
+The setup script installs and activates the following plugins automatically:
+
+| Plugin | Source | Description |
+|--------|--------|-------------|
+| `all-in-one-download` | GitHub (`tcacamou-ops`) | Core download portal |
+| `all-in-one-download-rottentomatoes` | GitHub (`tcacamou-ops`) | Rotten Tomatoes metadata add-on |
+| `all-in-one-download-transmission` | GitHub (`tcacamou-ops`) | Transmission integration |
+| `all-in-one-download-torr9` | GitHub (`tcacamou-ops`) | Torr9 torrent source add-on |
+| `all-in-one-download-c411` | GitHub (`tcacamou-ops`) | C411 torrent source add-on |
+| `crontroll` | WordPress.org | WP-Cron management UI |
+
+Plugin credentials (`TORR9_API_KEY`, `TORR9_FULL_TOKEN`, `C411_API_KEY`) are set automatically as WordPress options if provided in `.env`.
+
+> WP-Cron is disabled in `wp-config.php`. Ofelia triggers `wp-cron.php` every 5 minutes instead.
+
 ## Shared Folders
 
-Jellyfin and Transmission share the same `MEDIA_PATH`:
+Jellyfin and Transmission share the same `MEDIA_PATH` on the host:
 
-| Folder | Jellyfin path | Transmission path |
-|--------|---------------|-------------------|
-| Movies | `/media/Movies` | `/downloads/Movies` |
-| TV Shows | `/media/TvShows` | `/downloads/TvShows` |
-| Kids Movies | `/media/KidsMovies` | `/downloads/KidsMovies` |
-| Kids Shows | `/media/KidsTvShows` | `/downloads/KidsTvShows` |
-| Downloading | — | `/downloads/incomplete` |
-| Completed | — | `/downloads/complete` |
+| Host folder | Jellyfin path | Transmission path |
+|-------------|---------------|-------------------|
+| `$MEDIA_PATH/Movies` | `/media/Movies` | `/downloads/Movies` |
+| `$MEDIA_PATH/TvShows` | `/media/TvShows` | `/downloads/TvShows` |
+| `$MEDIA_PATH/KidsMovies` | `/media/KidsMovies` | `/downloads/KidsMovies` |
+| `$MEDIA_PATH/KidsTvShows` | `/media/KidsTvShows` | `/downloads/KidsTvShows` |
+| `$MEDIA_PATH/complete` | — | `/downloads/complete` |
+| `$MEDIA_PATH/incomplete` | — | `/downloads/incomplete` |
 
 ## Scripts
 
 All scripts are located in the `bin/` folder.
 
-### `bin/auto-setup.sh` — Full setup
+### `bin/auto-setup.sh` — Full setup (entry point)
 
 ```bash
 sudo bin/auto-setup.sh
 ```
 
-Main script that orchestrates the entire configuration. Re-run after any `.env` change.
-
-### `bin/setups/setup-jellyfin.sh` — Reconfigure Jellyfin only
-
-```bash
-bin/setups/setup-jellyfin.sh
-```
+Orchestrates the entire bootstrap. Re-run after any `.env` change.
 
 ### `bin/setups/setup-caddy.sh` — Regenerate Caddyfile only
 
@@ -134,27 +169,41 @@ bin/setups/setup-jellyfin.sh
 bash bin/setups/setup-caddy.sh
 ```
 
-Generates `caddy/Caddyfile` from `.env`. Run this if you change domains or SSL settings without running the full setup.
+Generates `caddy/Caddyfile` from `.env`. Run this if you change domains, SSL settings, or HTTP Basic Auth without running the full setup. If `WP_HTTP_AUTH_USER` and `WP_HTTP_AUTH_PASSWORD` are set, a bcrypt hash is generated via Caddy and injected as a `basicauth` directive in front of WordPress.
 
-### `bin/setups/auto-configure-jellyfin.py` — Reconfigure Jellyfin only (Python)
+### `bin/setups/setup-jellyfin.sh` — Reconfigure Jellyfin only
+
+```bash
+bash bin/setups/setup-jellyfin.sh
+```
+
+### `bin/setups/auto-configure-jellyfin.py` — Jellyfin REST API configuration
 
 ```bash
 python3 bin/setups/auto-configure-jellyfin.py
 ```
 
-### `bin/setups/setup-domains.sh` — Interactive manual configuration
+### `bin/setups/setup-wordpress.sh` — WordPress install + plugin setup only
+
+```bash
+bash bin/setups/setup-wordpress.sh
+```
+
+Installs/updates WordPress core and all plugins via WP-CLI. Safe to re-run.
+
+### `bin/setups/setup-domains.sh` — /etc/hosts helper
 
 ```bash
 bash bin/setups/setup-domains.sh
 ```
 
-Interactive menu: local/production setup, DNS instructions, service health check.
+Adds or removes `.local` domain entries in `/etc/hosts`.
 
 ### Reset scripts
 
 | Script | Action |
 |--------|--------|
-| `bin/reset-all.sh` | **Full** reset (removes everything) |
+| `bin/reset-all.sh` | **Full** reset — stops containers, removes all mounted data folders |
 | `bin/resets/reset-jellyfin.sh` | Reset Jellyfin only |
 | `bin/resets/reset-transmission.sh` | Reset Transmission only |
 
@@ -162,7 +211,7 @@ Interactive menu: local/production setup, DNS instructions, service health check
 
 ## Cron Jobs (Ofelia)
 
-Edit `cron/config.ini` to add scheduled tasks:
+Edit `cron/config.ini` to add scheduled tasks. Ofelia uses the Docker socket via `docker-socket-proxy` — only `CONTAINERS`, `EXEC`, `EVENTS`, and `POST` capabilities are exposed.
 
 ```ini
 # WordPress cron (every 5 minutes — enabled by default)
@@ -170,12 +219,6 @@ Edit `cron/config.ini` to add scheduled tasks:
 schedule = @every 5m
 container = wordpress-app
 command = php /var/www/html/wp-cron.php
-
-# Clean old torrents (daily at 3 AM — disabled)
-# [job-exec "clean-torrents"]
-# schedule = 0 0 3 * * *
-# container = transmission
-# command = find /downloads -type f -mtime +30 -delete
 ```
 
 After editing:
@@ -193,12 +236,22 @@ docker compose down
 
 # View logs for a service
 docker compose logs -f jellyfin
+docker compose logs -f wordpress-app
 
 # Restart a service
-docker compose restart transmission
+docker compose restart wordpress
 
-# Update all images
-docker compose pull && docker compose up -d
+# Pull latest images and recreate containers
+docker compose pull && docker compose up -d --force-recreate
+
+# Run WP-CLI manually
+docker exec -u www-data wordpress-app wp --path=/var/www/html <command>
+
+# Re-run WordPress setup only
+bash bin/setups/setup-wordpress.sh
+
+# Re-run Jellyfin setup only
+bash bin/setups/setup-jellyfin.sh
 
 # Backup data (excluding media files)
 docker compose down
@@ -211,49 +264,55 @@ docker compose up -d
 ```
 All-in-one-setup/
 ├── docker-compose.yml
-├── .env                    ← create from .env.example
+├── .env                        ← create from .env.example
 ├── .env.example
 ├── requirements.txt
 ├── README.md
+├── AGENTS.md                   ← project knowledge base (self-updating)
 ├── bin/
-│   ├── auto-setup.sh       ← main script
-│   ├── reset-all.sh
+│   ├── auto-setup.sh           ← main entry point
+│   ├── reset-all.sh            ← full reset (removes all mounted data)
 │   ├── resets/
 │   │   ├── reset-jellyfin.sh
 │   │   └── reset-transmission.sh
 │   └── setups/
-│       ├── auto-configure-jellyfin.py
-│       ├── setup-caddy.sh      ← generates caddy/Caddyfile
-│       ├── setup-domains.sh
-│       └── setup-jellyfin.sh
+│       ├── auto-configure-jellyfin.py  ← Jellyfin REST API setup
+│       ├── setup-caddy.sh              ← generates caddy/Caddyfile
+│       ├── setup-domains.sh            ← /etc/hosts helper
+│       ├── setup-jellyfin.sh
+│       └── setup-wordpress.sh          ← WP-CLI install + plugins
 ├── caddy/
-│   ├── Caddyfile           ← generated (git-ignored)
-│   ├── data/               ← certificates (git-ignored)
-│   └── config/             ← caddy internal state (git-ignored)
+│   ├── Caddyfile               ← generated by setup-caddy.sh (do not edit manually)
+│   ├── data/                   ← Let's Encrypt certificates (persistent)
+│   └── config/                 ← Caddy runtime state (persistent)
 ├── cron/
-│   └── config.ini
+│   └── config.ini              ← Ofelia job definitions
 ├── jellyfin/
-│   ├── config/
-│   └── cache/
+│   ├── config/                 ← Jellyfin config, data, metadata, plugins
+│   └── cache/                  ← transcodes, image cache
 ├── transmission/
-│   ├── config/
-│   └── watch/
+│   ├── config/                 ← settings, torrents, resume files
+│   └── watch/                  ← drop .torrent files here to auto-add
 ├── wordpress/
-│   ├── html/
-│   ├── plugins/
-│   ├── themes/
-│   └── uploads/
+│   ├── html/                   ← WordPress core files
+│   ├── plugins/                ← bind-mounted to wp-content/plugins
+│   ├── themes/                 ← bind-mounted to wp-content/themes
+│   └── uploads/                ← bind-mounted to wp-content/uploads
 └── mysql/
-    └── data/
+    └── data/                   ← MySQL data directory
 ```
 
 ## Network Architecture
 
-Two Docker networks are created:
-- `media-network`: Jellyfin, Transmission, Caddy
-- `wordpress-network`: WordPress, MySQL, Caddy
+Three Docker networks are created:
 
-This separation isolates WordPress from the media network while allowing Caddy to reach all services.
+| Network | Services | Notes |
+|---------|----------|-------|
+| `media-network` | Jellyfin, Transmission, Caddy, Ofelia | Standard bridge |
+| `wordpress-network` | WordPress, MySQL, Caddy, Ofelia | Standard bridge |
+| `socket-proxy-network` | Ofelia ↔ docker-socket-proxy | Internal only (no Internet) |
+
+Caddy bridges `media-network` and `wordpress-network` to reach all services. Ofelia connects to the Docker daemon through `docker-socket-proxy` over TCP instead of mounting `/var/run/docker.sock` directly.
 
 ## Troubleshooting
 

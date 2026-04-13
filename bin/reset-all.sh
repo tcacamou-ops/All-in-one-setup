@@ -56,29 +56,13 @@ echo ""
 
 # ─── 2. Reset Jellyfin ───────────────────────────────────────────────────────
 echo -e "${YELLOW}[2/5] Resetting Jellyfin...${NC}"
-sudo rm -rf \
-    "$ROOT_DIR/jellyfin/config/config" \
-    "$ROOT_DIR/jellyfin/config/data" \
-    "$ROOT_DIR/jellyfin/config/log" \
-    "$ROOT_DIR/jellyfin/config/metadata" \
-    "$ROOT_DIR/jellyfin/config/plugins" \
-    "$ROOT_DIR/jellyfin/config/root" \
-    "$ROOT_DIR/jellyfin/config/.jellyfin-data" \
-    "$ROOT_DIR/jellyfin/cache/transcodes"
+sudo rm -rf "$ROOT_DIR/jellyfin/config" "$ROOT_DIR/jellyfin/cache"
 echo -e "${GREEN}✓ Jellyfin reset${NC}"
 echo ""
 
 # ─── 3. Reset Transmission ──────────────────────────────────────────────────
 echo -e "${YELLOW}[3/5] Resetting Transmission...${NC}"
-sudo rm -rf \
-    "$ROOT_DIR/transmission/config/settings.json" \
-    "$ROOT_DIR/transmission/config/bandwidth-groups.json" \
-    "$ROOT_DIR/transmission/config/queue.json" \
-    "$ROOT_DIR/transmission/config/stats.json" \
-    "$ROOT_DIR/transmission/config/resume" \
-    "$ROOT_DIR/transmission/config/torrents" \
-    "$ROOT_DIR/transmission/config/blocklists"
-sudo rm -rf "$ROOT_DIR/transmission/watch"/*  2>/dev/null || true
+sudo rm -rf "$ROOT_DIR/transmission/config" "$ROOT_DIR/transmission/watch"
 echo -e "${GREEN}✓ Transmission reset${NC}"
 echo ""
 
@@ -93,12 +77,12 @@ echo ""
 
 # ─── 5. Reset MySQL + WordPress ─────────────────────────────────────────────
 echo -e "${YELLOW}[5/5] Resetting MySQL and WordPress...${NC}"
-sudo rm -rf "$ROOT_DIR/mysql/data"/*
+sudo rm -rf "$ROOT_DIR/mysql/data"
 sudo rm -rf \
-    "$ROOT_DIR/wordpress/html"/* \
-    "$ROOT_DIR/wordpress/plugins"/* \
-    "$ROOT_DIR/wordpress/themes"/* \
-    "$ROOT_DIR/wordpress/uploads"/*
+    "$ROOT_DIR/wordpress/html" \
+    "$ROOT_DIR/wordpress/plugins" \
+    "$ROOT_DIR/wordpress/themes" \
+    "$ROOT_DIR/wordpress/uploads"
 echo -e "${GREEN}✓ MySQL and WordPress reset${NC}"
 echo ""
 

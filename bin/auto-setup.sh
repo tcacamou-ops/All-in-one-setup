@@ -155,12 +155,22 @@ echo ""
 echo -e "${BLUE}🎬 Configuring Jellyfin...${NC}"
 echo ""
 
+set +e
 python3 "$SCRIPT_DIR/setups/auto-configure-jellyfin.py"
-
 JELLYFIN_EXIT_CODE=$?
+set -e
 echo ""
 
-if [ $JELLYFIN_EXIT_CODE -eq 0 ]; then
+echo -e "${BLUE}🌐 Configuring WordPress...${NC}"
+echo ""
+
+set +e
+bash "$SCRIPT_DIR/setups/setup-wordpress.sh"
+WP_EXIT_CODE=$?
+set -e
+echo ""
+
+if [ $JELLYFIN_EXIT_CODE -eq 0 ] && [ $WP_EXIT_CODE -eq 0 ]; then
     echo -e "${GREEN}╔════════════════════════════════════════════════╗${NC}"
     echo -e "${GREEN}║      ✓ Setup completed successfully!           ║${NC}"
     echo -e "${GREEN}╚════════════════════════════════════════════════╝${NC}"
@@ -177,6 +187,7 @@ if [ $JELLYFIN_EXIT_CODE -eq 0 ]; then
     echo "   • Jellyfin:      ${protocol}://${DOMAIN_JELLYFIN}"
     echo "   • Transmission:  ${protocol}://${DOMAIN_TRANSMISSION}"
     echo "   • WordPress:     ${protocol}://${DOMAIN_WORDPRESS}"
+    echo "   • WP Admin:      ${protocol}://${DOMAIN_WORDPRESS}/wp-admin"
     echo ""
 
     if [ "${ENABLE_SSL}" = "false" ]; then

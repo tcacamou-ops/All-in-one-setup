@@ -330,7 +330,7 @@ def wait_for_jellyfin(base_url: str = "http://localhost:8096", timeout: int = 12
 def main():
     """Main function"""
     print("╔════════════════════════════════════════════════╗")
-    print("║  Automated Jellyfin Configuration            ║")
+    print("║  Automated Jellyfin Configuration              ║")
     print("╚════════════════════════════════════════════════╝")
     print()
     

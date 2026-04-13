@@ -104,7 +104,7 @@ case $choice in
     2)
         echo ""
         echo -e "${BLUE}╔════════════════════════════════════════════════╗${NC}"
-        echo -e "${BLUE}║   Production Setup                            ║${NC}"
+        echo -e "${BLUE}║   Production Setup                             ║${NC}"
         echo -e "${BLUE}╚════════════════════════════════════════════════╝${NC}"
         echo ""
 

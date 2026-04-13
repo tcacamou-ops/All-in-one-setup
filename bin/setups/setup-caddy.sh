@@ -28,6 +28,17 @@ DOMAIN_WORDPRESS="${DOMAIN_WORDPRESS:-wordpress.local}"
 LETSENCRYPT_EMAIL="${LETSENCRYPT_EMAIL:-admin@example.com}"
 ENABLE_SSL="${ENABLE_SSL:-false}"
 
+# ── Basic Auth for WordPress ──────────────────────────────────────────────────
+WP_AUTH_BLOCK=""
+if [ -n "${WP_HTTP_AUTH_USER:-}" ] && [ -n "${WP_HTTP_AUTH_PASSWORD:-}" ]; then
+    WP_BASICAUTH_HASH=$(docker run --rm caddy:latest caddy hash-password --plaintext "$WP_HTTP_AUTH_PASSWORD" 2>/dev/null | tr -d '\r\n')
+    if [ -z "$WP_BASICAUTH_HASH" ]; then
+        echo -e "${RED}✗ Failed to generate bcrypt hash (is Docker running?)${NC}"
+        exit 1
+    fi
+    WP_AUTH_BLOCK=$(printf '\tbasicauth {\n\t\t%s %s\n\t}' "$WP_HTTP_AUTH_USER" "$WP_BASICAUTH_HASH")
+fi
+
 mkdir -p "$ROOT_DIR/caddy"
 
 echo -e "${BLUE}📝 Generating Caddyfile...${NC}"
@@ -35,6 +46,11 @@ echo "  • Jellyfin:     $DOMAIN_JELLYFIN"
 echo "  • Transmission: $DOMAIN_TRANSMISSION"
 echo "  • WordPress:    $DOMAIN_WORDPRESS"
 echo "  • SSL:          $ENABLE_SSL"
+if [ -n "${WP_HTTP_AUTH_USER:-}" ]; then
+    echo "  • WP BasicAuth: enabled (user: $WP_HTTP_AUTH_USER)"
+else
+    echo "  • WP BasicAuth: disabled"
+fi
 echo ""
 
 # ── Local / self-signed mode (no public internet) ────────────────────────────
@@ -78,16 +94,17 @@ http://$DOMAIN_TRANSMISSION {
 	}
 }
 
-# http://$DOMAIN_WORDPRESS {
-# 	reverse_proxy wordpress-app:80 {
-# 		header_up X-Real-IP {remote_host}
-# 		header_up X-Forwarded-For {remote_host}
-# 		header_up X-Forwarded-Proto {scheme}
-# 	}
-# 	request_body {
-# 		max_size 64MB
-# 	}
-# }
+http://$DOMAIN_WORDPRESS {
+$WP_AUTH_BLOCK
+	reverse_proxy wordpress-app:80 {
+		header_up X-Real-IP {remote_host}
+		header_up X-Forwarded-For {remote_host}
+		header_up X-Forwarded-Proto {scheme}
+	}
+	request_body {
+		max_size 64MB
+	}
+}
 EOF
 
 # ── Production mode (Let's Encrypt) ──────────────────────────────────────────
@@ -133,16 +150,17 @@ $DOMAIN_TRANSMISSION {
 	}
 }
 
-# $DOMAIN_WORDPRESS {
-# 	reverse_proxy wordpress-app:80 {
-# 		header_up X-Real-IP {remote_host}
-# 		header_up X-Forwarded-For {remote_host}
-# 		header_up X-Forwarded-Proto {scheme}
-# 	}
-# 	request_body {
-# 		max_size 64MB
-# 	}
-# }
+$DOMAIN_WORDPRESS {
+$WP_AUTH_BLOCK
+	reverse_proxy wordpress-app:80 {
+		header_up X-Real-IP {remote_host}
+		header_up X-Forwarded-For {remote_host}
+		header_up X-Forwarded-Proto {scheme}
+	}
+	request_body {
+		max_size 64MB
+	}
+}
 EOF
 fi
 

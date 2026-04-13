@@ -1,5 +1,6 @@
 # Environment variables with sensitive data
 .env
+AGENTS.md
 
 # Docker volumes and data directories
 jellyfin/
