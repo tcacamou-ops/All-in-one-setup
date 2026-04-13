@@ -55,27 +55,30 @@ else
 fi
 echo ""
 
-# Wait for WordPress to be fully initialized (wp-config.php is written only once
-# the container has successfully connected to MySQL)
-echo -e "${YELLOW}⏳ Waiting for WordPress to be ready (MySQL + entrypoint)...${NC}"
+# Wait for MySQL to be reachable from the WordPress container
+echo -e "${YELLOW}⏳ Waiting for MySQL to accept connections...${NC}"
 MAX_TRIES=60
 TRIES=0
 while [ $TRIES -lt $MAX_TRIES ]; do
-    if docker exec wordpress-app test -f /var/www/html/wp-config.php 2>/dev/null; then
+    if docker exec wordpress-app bash -c \
+        "php -r \"
+\\\$conn = @mysqli_connect('mysql', '${MYSQL_USER}', '${MYSQL_PASSWORD}', '${MYSQL_DATABASE}');
+if (\\\$conn) { mysqli_close(\\\$conn); exit(0); } exit(1);
+\"" 2>/dev/null; then
         break
     fi
     TRIES=$((TRIES + 1))
     if [ $TRIES -ge $MAX_TRIES ]; then
         echo ""
-        echo -e "${RED}✗ WordPress container did not initialize in time${NC}"
-        echo -e "${YELLOW}Check logs with: docker logs wordpress-app${NC}"
+        echo -e "${RED}✗ MySQL did not become ready in time${NC}"
+        echo -e "${YELLOW}Check logs with: docker logs mysql${NC}"
         exit 1
     fi
     echo -n "."
     sleep 3
 done
 echo ""
-echo -e "${GREEN}✓ WordPress is ready${NC}"
+echo -e "${GREEN}✓ MySQL is ready${NC}"
 echo ""
 
 # Install WP-CLI inside the container (download only if not already present)
