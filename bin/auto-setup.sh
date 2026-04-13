@@ -94,6 +94,14 @@ echo "Setting ownership ${PUID}:${PGID} and permissions 775 on $MEDIA_PATH..."
 chown -R "${PUID}:${PGID}" "$MEDIA_PATH"
 chmod -R 775 "$MEDIA_PATH"
 echo -e "${GREEN}✓ Media folders ready${NC}"
+
+# Ensure the WordPress uploads directory is owned by www-data (uid 33) so plugins
+# can create sub-directories at runtime without permission errors
+WP_UPLOADS_DIR="$ROOT_DIR/wordpress/uploads"
+mkdir -p "$WP_UPLOADS_DIR"
+chown 33:33 "$WP_UPLOADS_DIR"
+chmod 775 "$WP_UPLOADS_DIR"
+echo -e "${GREEN}✓ WordPress uploads directory ready (www-data ownership)${NC}"
 echo ""
 
 # Configure /etc/hosts for .local domains

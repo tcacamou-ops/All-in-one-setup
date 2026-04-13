@@ -259,6 +259,10 @@ PLUGIN_C411_ZIP_URL=$(curl -sSL "https://api.github.com/repos/tcacamou-ops/All-i
 if [ -z "$PLUGIN_C411_ZIP_URL" ]; then
     echo -e "${YELLOW}⚠️  Could not fetch all-in-one-download-c411 release URL, skipping${NC}"
 else
+    # Ensure the upload directory exists with correct ownership before activating the plugin
+    docker exec wordpress-app mkdir -p /var/www/html/wp-content/uploads/c411
+    docker exec wordpress-app chown -R www-data:www-data /var/www/html/wp-content/uploads/c411
+
     docker exec -u www-data wordpress-app wp plugin install "$PLUGIN_C411_ZIP_URL" \
         --path=/var/www/html \
         --activate \
@@ -287,11 +291,15 @@ docker exec -u www-data wordpress-app wp plugin install crontroll \
 echo -e "${GREEN}✓ Plugin crontroll installed and activated${NC}"
 echo ""
 
-# Disable built-in WP-Cron — Ofelia handles it via job-exec every 5 minutes
-echo -e "${BLUE}⏰ Configuring WP-Cron (delegated to Ofelia)...${NC}"
-docker exec -u www-data wordpress-app wp config set DISABLE_WP_CRON true --raw \
-    --path=/var/www/html 2>/dev/null || true
-echo -e "${GREEN}✓ Built-in WP-Cron disabled (Ofelia will trigger wp-cron.php every 5 min)${NC}"
+# Disable built-in WP-Cron if explicitly requested
+echo -e "${BLUE}⏰ Configuring WP-Cron...${NC}"
+if [ "${DISABLE_WP_CRON:-false}" = "true" ]; then
+    docker exec -u www-data wordpress-app wp config set DISABLE_WP_CRON true --raw \
+        --path=/var/www/html 2>/dev/null || true
+    echo -e "${GREEN}✓ Built-in WP-Cron disabled (Ofelia will trigger wp-cron.php every 5 min)${NC}"
+else
+    echo -e "${YELLOW}⚠️  DISABLE_WP_CRON not set to true, WP-Cron left enabled${NC}"
+fi
 echo ""
 
 echo -e "${GREEN}╔════════════════════════════════════════════════╗${NC}"
