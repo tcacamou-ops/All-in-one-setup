@@ -166,7 +166,7 @@ $WP_AUTH_BLOCK
 		header_up X-Forwarded-For {remote_host}
 		header_up X-Forwarded-Proto {scheme}
 	}
-$(generate_security_headers "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; frame-ancestors 'self'")
+$(generate_security_headers "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com; style-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com; img-src 'self' data: blob: https://secure.gravatar.com; font-src 'self' data:; frame-ancestors 'self'")
 	request_body {
 		max_size 64MB
 	}

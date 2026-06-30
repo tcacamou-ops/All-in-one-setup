@@ -97,6 +97,12 @@ services:
       - MYSQL_PASSWORD=${MYSQL_PASSWORD:-wordpress}
     volumes:
       - ./mysql/data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-rootpassword}"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
     security_opt:
       - no-new-privileges:true
     restart: unless-stopped
@@ -108,7 +114,8 @@ services:
     image: wordpress:latest
     container_name: wordpress-app
     depends_on:
-      - mysql
+      mysql:
+        condition: service_healthy
     environment:
       - WORDPRESS_DB_HOST=mysql:3306
       - WORDPRESS_DB_USER=${MYSQL_USER:-wordpress}
