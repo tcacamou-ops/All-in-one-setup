@@ -290,6 +290,32 @@ else
 fi
 echo ""
 
+# Install / update all-in-one-download-gemini-tracker plugin (latest GitHub release)
+echo -e "${BLUE}🔌 Installing all-in-one-download-gemini-tracker plugin...${NC}"
+PLUGIN_GT_ZIP_URL=$(curl -sSL "https://api.github.com/repos/tcacamou-ops/All-in-one-Download-gemini-tracker/releases/latest" \
+    | grep -oP '"browser_download_url":\s*"\K[^"]+\.zip')
+if [ -z "$PLUGIN_GT_ZIP_URL" ]; then
+    echo -e "${YELLOW}⚠️  Could not fetch all-in-one-download-gemini-tracker release URL, skipping${NC}"
+else
+    docker exec -u www-data wordpress-app wp plugin install "$PLUGIN_GT_ZIP_URL" \
+        --path=/var/www/html \
+        --activate \
+        --force 2>&1 | tail -3
+    echo -e "${GREEN}✓ Plugin all-in-one-download-gemini-tracker installed and activated${NC}"
+fi
+
+# Configure all-in-one-download-gemini-tracker credentials
+echo -e "${BLUE}🔑 Configuring all-in-one-download-gemini-tracker credentials...${NC}"
+GEMINI_TRACKER_API_KEY="${GEMINI_TRACKER_API_KEY:-}"
+if [ -n "$GEMINI_TRACKER_API_KEY" ]; then
+    docker exec -u www-data wordpress-app wp option update alli1d_gemini_tracker_api_key "$GEMINI_TRACKER_API_KEY" \
+        --path=/var/www/html
+    echo -e "${GREEN}✓ alli1d_gemini_tracker_api_key set${NC}"
+else
+    echo -e "${YELLOW}⚠️  GEMINI_TRACKER_API_KEY not set, skipping${NC}"
+fi
+echo ""
+
 # Install / update crontroll plugin (WordPress.org)
 echo -e "${BLUE}🔌 Installing crontroll plugin...${NC}"
 docker exec -u www-data wordpress-app wp plugin install crontroll \
