@@ -97,14 +97,18 @@ if docker exec -u www-data wordpress-app wp core is-installed --path=/var/www/ht
     echo -e "${GREEN}✓ WordPress already installed, skipping core install${NC}"
 else
     echo -e "${BLUE}🚀 Installing WordPress core...${NC}"
-    docker exec -u www-data wordpress-app wp core install \
-        --path=/var/www/html \
-        --url="$SITE_URL" \
-        --title="$WP_SITE_TITLE" \
-        --admin_user="$WP_ADMIN_USER" \
-        --admin_password="$WP_ADMIN_PASSWORD" \
-        --admin_email="$WP_ADMIN_EMAIL" \
-        --skip-email
+    docker exec \
+        -u www-data \
+        -e WP_ADMIN_PASS="$WP_ADMIN_PASSWORD" \
+        wordpress-app \
+        bash -c "wp core install \
+            --path=/var/www/html \
+            --url='$SITE_URL' \
+            --title='$WP_SITE_TITLE' \
+            --admin_user='$WP_ADMIN_USER' \
+            --admin_password=\"\$WP_ADMIN_PASS\" \
+            --admin_email='$WP_ADMIN_EMAIL' \
+            --skip-email"
     echo -e "${GREEN}✓ WordPress installed successfully${NC}"
 fi
 echo ""
@@ -169,6 +173,10 @@ PLUGIN_RT_ZIP_URL=$(curl -sSL "https://api.github.com/repos/tcacamou-ops/All-in-
 if [ -z "$PLUGIN_RT_ZIP_URL" ]; then
     echo -e "${YELLOW}⚠️  Could not fetch all-in-one-download-rottentomatoes release URL, skipping${NC}"
 else
+    # Ensure the upload directory exists with correct ownership before activating the plugin
+    docker exec wordpress-app mkdir -p /var/www/html/wp-content/uploads/rottentomatoes
+    docker exec wordpress-app chown -R www-data:www-data /var/www/html/wp-content/uploads/rottentomatoes
+
     docker exec -u www-data wordpress-app wp plugin install "$PLUGIN_RT_ZIP_URL" \
         --path=/var/www/html \
         --activate \

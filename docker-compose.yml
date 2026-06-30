@@ -15,10 +15,9 @@ services:
       - ${MEDIA_PATH}/KidsMovies:/media/KidsMovies
       - ${MEDIA_PATH}/KidsTvShows:/media/KidsTvShows
     # 8096 bound to 127.0.0.1 only: accessible locally for setup scripts, not exposed publicly
-    # 7359/udp: Jellyfin LAN client discovery
+    # 7359/udp removed: LAN discovery not needed — clients connect via Caddy URL
     ports:
       - "127.0.0.1:8096:8096"
-      - "7359:7359/udp"
     security_opt:
       - no-new-privileges:true
     restart: unless-stopped
@@ -59,9 +58,9 @@ services:
     environment:
       - LOG_LEVEL=warning
       - CONTAINERS=1  # list/inspect containers
-      - EXEC=1        # create and start exec sessions (job-exec)
+      - EXEC=0        # disabled: job-http replaces job-exec (no arbitrary exec in containers)
       - EVENTS=1      # Docker event stream (daemon --docker mode)
-      - POST=1        # allow POST requests (required to create/start exec sessions)
+      - POST=0        # disabled: no exec sessions to create
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     restart: unless-stopped

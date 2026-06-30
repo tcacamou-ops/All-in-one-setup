@@ -27,6 +27,9 @@ DOMAIN_TRANSMISSION="${DOMAIN_TRANSMISSION:-transmission.local}"
 DOMAIN_WORDPRESS="${DOMAIN_WORDPRESS:-wordpress.local}"
 LETSENCRYPT_EMAIL="${LETSENCRYPT_EMAIL:-admin@example.com}"
 ENABLE_SSL="${ENABLE_SSL:-false}"
+# HSTS preload submits the domain to browser preload lists — permanent, cannot be undone for months.
+# includeSubDomains also covers every subdomain; do not enable unless ALL subdomains are HTTPS-only.
+HSTS_PRELOAD="${HSTS_PRELOAD:-false}"
 
 # ── Basic Auth for WordPress ──────────────────────────────────────────────────
 WP_AUTH_BLOCK=""
@@ -36,8 +39,32 @@ if [ -n "${WP_HTTP_AUTH_USER:-}" ] && [ -n "${WP_HTTP_AUTH_PASSWORD:-}" ]; then
         echo -e "${RED}✗ Failed to generate bcrypt hash (is Docker running?)${NC}"
         exit 1
     fi
-    WP_AUTH_BLOCK=$(printf '\tbasicauth {\n\t\t%s %s\n\t}' "$WP_HTTP_AUTH_USER" "$WP_BASICAUTH_HASH")
+    WP_AUTH_BLOCK=$(printf '\t@notcron {\n\t\tnot path /wp-cron.php\n\t}\n\tbasicauth @notcron {\n\t\t%s %s\n\t}' "$WP_HTTP_AUTH_USER" "$WP_BASICAUTH_HASH")
 fi
+
+# ── Security headers helper ───────────────────────────────────────────────────
+# $1 — Content-Security-Policy value (defaults to conservative 'self' policy)
+# $2 — X-Frame-Options value (defaults to SAMEORIGIN; pass DENY when CSP uses frame-ancestors 'none')
+# HSTS is injected only when ENABLE_SSL=true (would break HTTP-only sites)
+# HSTS preload directive requires HSTS_PRELOAD=true in .env (opt-in — see note above)
+generate_security_headers() {
+    local csp="${1:-default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; frame-ancestors 'none'}"
+    local xfo="${2:-SAMEORIGIN}"
+    printf '\theader {\n'
+    printf '\t\tX-Content-Type-Options        "nosniff"\n'
+    printf '\t\tX-Frame-Options               "%s"\n' "$xfo"
+    printf '\t\tX-XSS-Protection              "0"\n'
+    printf '\t\tReferrer-Policy               "strict-origin-when-cross-origin"\n'
+    printf '\t\tPermissions-Policy            "camera=(), microphone=(), geolocation=(), payment=()"\n'
+    printf '\t\tContent-Security-Policy       "%s"\n' "$csp"
+    if [ "$ENABLE_SSL" = "true" ]; then
+        local hsts="max-age=63072000; includeSubDomains"
+        [ "$HSTS_PRELOAD" = "true" ] && hsts="$hsts; preload"
+        printf '\t\tStrict-Transport-Security     "%s"\n' "$hsts"
+    fi
+    printf '\t\t-Server\n'
+    printf '\t}\n'
+}
 
 mkdir -p "$ROOT_DIR/caddy"
 
@@ -71,11 +98,7 @@ http://$DOMAIN_JELLYFIN {
 		header_up X-Forwarded-Proto {scheme}
 		header_up X-Forwarded-Host {host}
 	}
-	header {
-		X-Content-Type-Options nosniff
-		X-Frame-Options SAMEORIGIN
-		-Server
-	}
+$(generate_security_headers "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; media-src 'self' blob:; worker-src 'self' blob:; connect-src 'self' https:; frame-ancestors 'none'" "DENY")
 	request_body {
 		max_size 20MB
 	}
@@ -87,11 +110,7 @@ http://$DOMAIN_TRANSMISSION {
 		header_up X-Forwarded-For {remote_host}
 		header_up X-Forwarded-Proto {scheme}
 	}
-	header {
-		X-Content-Type-Options nosniff
-		X-Frame-Options SAMEORIGIN
-		-Server
-	}
+$(generate_security_headers)
 }
 
 http://$DOMAIN_WORDPRESS {
@@ -101,6 +120,7 @@ $WP_AUTH_BLOCK
 		header_up X-Forwarded-For {remote_host}
 		header_up X-Forwarded-Proto {scheme}
 	}
+$(generate_security_headers "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; frame-ancestors 'self'")
 	request_body {
 		max_size 64MB
 	}
@@ -124,14 +144,7 @@ $DOMAIN_JELLYFIN {
 		header_up X-Forwarded-Proto {scheme}
 		header_up X-Forwarded-Host {host}
 	}
-	header {
-		X-Content-Type-Options nosniff
-		X-Frame-Options SAMEORIGIN
-		X-XSS-Protection "1; mode=block"
-		Permissions-Policy "accelerometer=(), ambient-light-sensor=(), battery=(), bluetooth=(), camera=(), clipboard-read=(), display-capture=(), document-domain=(), encrypted-media=(), gamepad=(), geolocation=(), gyroscope=(), hid=(), idle-detection=(), interest-cohort=(), keyboard-map=(), local-fonts=(), magnetometer=(), microphone=(), payment=(), publickey-credentials-get=(), serial=(), sync-xhr=(), usb=(), xr-spatial-tracking=()"
-		Content-Security-Policy "default-src https: data: blob: ; img-src 'self' https://* ; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://www.youtube.com blob:; worker-src 'self' blob:; connect-src 'self'; object-src 'none'; font-src 'self'"
-		-Server
-	}
+$(generate_security_headers "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; media-src 'self' blob:; worker-src 'self' blob:; connect-src 'self' https:; frame-ancestors 'none'" "DENY")
 	request_body {
 		max_size 20MB
 	}
@@ -143,11 +156,7 @@ $DOMAIN_TRANSMISSION {
 		header_up X-Forwarded-For {remote_host}
 		header_up X-Forwarded-Proto {scheme}
 	}
-	header {
-		X-Content-Type-Options nosniff
-		X-Frame-Options SAMEORIGIN
-		-Server
-	}
+$(generate_security_headers)
 }
 
 $DOMAIN_WORDPRESS {
@@ -157,6 +166,7 @@ $WP_AUTH_BLOCK
 		header_up X-Forwarded-For {remote_host}
 		header_up X-Forwarded-Proto {scheme}
 	}
+$(generate_security_headers "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; frame-ancestors 'self'")
 	request_body {
 		max_size 64MB
 	}

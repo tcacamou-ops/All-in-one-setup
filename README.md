@@ -227,6 +227,111 @@ After editing:
 docker compose restart cron
 ```
 
+## Updating the Stack
+
+### What is never lost
+
+All persistent data lives on **bind mounts** (local folders, not Docker volumes). `docker compose down`, `docker compose pull`, and image recreation never touch them:
+
+| Service | Data location | What is preserved |
+|---------|--------------|-------------------|
+| **WordPress** | `mysql/data/` | Full database (posts, options, users, plugin settings) |
+| **WordPress** | `wordpress/uploads/` | Uploaded media files |
+| **Transmission** | `transmission/config/` | Active torrents, resume files, `settings.json` |
+| **Jellyfin** | `jellyfin/config/` | Library metadata, users, watch history, plugins |
+| **Caddy** | `caddy/data/` | Let's Encrypt certificates |
+
+### Standard update procedure
+
+Run these steps from the `All-in-one-setup/` directory each time you pull new code:
+
+**Step 1 — Pull the latest scripts and compose file**
+
+```bash
+git -C .. pull   # from All-in-one-setup/; adjusts to your repo layout
+# or from the repo root:
+# git pull
+```
+
+**Step 2 — Pull the latest Docker images**
+
+```bash
+docker compose pull
+```
+
+This downloads new versions of `wordpress:latest`, `jellyfin/jellyfin:latest`, `mysql:8.0`, etc. Containers are not restarted yet.
+
+**Step 3 — Reload Caddy config (if `setup-caddy.sh` changed)**
+
+```bash
+bash bin/setups/setup-caddy.sh
+docker exec caddy caddy reload --config /etc/caddy/Caddyfile
+```
+
+Caddy reloads hot — no downtime, no certificate loss.
+
+**Step 4 — Recreate containers with new images**
+
+```bash
+docker compose up -d
+```
+
+Docker Compose only recreates the containers whose image or config changed. The others are left running. Data bind mounts are reattached automatically.
+
+**Step 5 — Update WordPress core and all plugins**
+
+```bash
+sudo bash bin/setups/setup-wordpress.sh
+```
+
+The script detects that WordPress is already installed and skips `core install`. It then:
+- Checks for a WordPress core update (`wp core update`)
+- Reinstalls each plugin from the latest GitHub release with `wp plugin install --force`
+- Re-applies all credentials from `.env`
+
+Safe to re-run at any time. The WordPress database is never reset.
+
+### Full one-liner (when no `.env` changes)
+
+```bash
+docker compose pull && \
+bash bin/setups/setup-caddy.sh && \
+docker compose up -d && \
+docker exec caddy caddy reload --config /etc/caddy/Caddyfile && \
+sudo bash bin/setups/setup-wordpress.sh
+```
+
+### Verify after update
+
+```bash
+# All containers running
+docker compose ps
+
+# Check Caddy received new config (look for "config loaded" or no error)
+docker compose logs --tail=20 caddy
+
+# Check WordPress plugins are at latest version
+docker exec -u www-data wordpress-app wp plugin list --path=/var/www/html
+
+# Check Transmission still has its torrents
+docker exec transmission ls /config/torrents/
+
+# Spot-check Jellyfin library is intact
+docker compose logs --tail=20 jellyfin
+```
+
+### When `.env` variables changed
+
+If you edited `.env` (new domain, SSL toggle, credentials, media path):
+
+```bash
+sudo bash bin/auto-setup.sh
+```
+
+`auto-setup.sh` re-runs the full bootstrap — it is idempotent: WordPress is not reinstalled, Jellyfin is not reset, existing data is untouched.
+
+---
+
 ## Useful Commands
 
 ```bash
