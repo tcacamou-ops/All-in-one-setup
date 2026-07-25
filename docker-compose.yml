@@ -126,6 +126,7 @@ services:
       - ./wordpress/plugins:/var/www/html/wp-content/plugins
       - ./wordpress/themes:/var/www/html/wp-content/themes
       - ./wordpress/uploads:/var/www/html/wp-content/uploads
+      - ${MEDIA_PATH}:/downloads
     security_opt:
       - no-new-privileges:true
     restart: unless-stopped
