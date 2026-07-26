@@ -89,7 +89,6 @@ AIO_TV_SHOW_DIRECTORY=downloads/TvShows
 
 # Plugin credentials (optional — leave empty to skip)
 TR4KER_API_KEY=
-TR4KER_FULL_TOKEN=
 C411_API_KEY=
 GEMINI_TRACKER_API_KEY=
 ```
@@ -140,7 +139,7 @@ The setup script installs and activates the following plugins automatically:
 | `all-in-one-download-gemini-tracker` | GitHub (`tcacamou-ops`) | Gemini Tracker torrent source add-on |
 | `crontroll` | WordPress.org | WP-Cron management UI |
 
-Plugin credentials (`TR4KER_API_KEY`, `TR4KER_FULL_TOKEN`, `C411_API_KEY`, `GEMINI_TRACKER_API_KEY`) are set automatically as WordPress options if provided in `.env`.
+Plugin credentials (`TR4KER_API_KEY`, `C411_API_KEY`, `GEMINI_TRACKER_API_KEY`) are set automatically as WordPress options if provided in `.env`.
 
 > WP-Cron is disabled in `wp-config.php`. Ofelia triggers `wp-cron.php` every 5 minutes instead.
 
