@@ -79,13 +79,17 @@ WP_SITE_TITLE="My Download Site"
 WP_HTTP_AUTH_USER=
 WP_HTTP_AUTH_PASSWORD=
 
+# WordPress debug mode (optional — leave false for production)
+WORDPRESS_DEBUG=false
+WORDPRESS_CONFIG_EXTRA="define('WP_DEBUG_LOG', true); define('WP_DEBUG_DISPLAY', false); define('SCRIPT_DEBUG', true);"
+
 # All-in-one-download plugin — paths relative to $MEDIA_PATH inside the container
 AIO_MOVIE_DIRECTORY=downloads/Movies
 AIO_TV_SHOW_DIRECTORY=downloads/TvShows
 
 # Plugin credentials (optional — leave empty to skip)
-TORR9_API_KEY=
-TORR9_FULL_TOKEN=
+TR4KER_API_KEY=
+TR4KER_FULL_TOKEN=
 C411_API_KEY=
 GEMINI_TRACKER_API_KEY=
 ```
@@ -131,12 +135,12 @@ The setup script installs and activates the following plugins automatically:
 | `all-in-one-download` | GitHub (`tcacamou-ops`) | Core download portal |
 | `all-in-one-download-rottentomatoes` | GitHub (`tcacamou-ops`) | Rotten Tomatoes metadata add-on |
 | `all-in-one-download-transmission` | GitHub (`tcacamou-ops`) | Transmission integration |
-| `all-in-one-download-torr9` | GitHub (`tcacamou-ops`) | Torr9 torrent source add-on |
+| `all-in-one-download-torr9` | GitHub (`tcacamou-ops`) | Tr4ker torrent source add-on |
 | `all-in-one-download-c411` | GitHub (`tcacamou-ops`) | C411 torrent source add-on |
 | `all-in-one-download-gemini-tracker` | GitHub (`tcacamou-ops`) | Gemini Tracker torrent source add-on |
 | `crontroll` | WordPress.org | WP-Cron management UI |
 
-Plugin credentials (`TORR9_API_KEY`, `TORR9_FULL_TOKEN`, `C411_API_KEY`, `GEMINI_TRACKER_API_KEY`) are set automatically as WordPress options if provided in `.env`.
+Plugin credentials (`TR4KER_API_KEY`, `TR4KER_FULL_TOKEN`, `C411_API_KEY`, `GEMINI_TRACKER_API_KEY`) are set automatically as WordPress options if provided in `.env`.
 
 > WP-Cron is disabled in `wp-config.php`. Ofelia triggers `wp-cron.php` every 5 minutes instead.
 
@@ -475,6 +479,29 @@ docker compose ps caddy
 docker compose logs --tail=50 caddy
 # Wait a few seconds for Let's Encrypt — then check again
 ```
+
+### Enable WordPress debug mode
+
+Set in `.env`:
+
+```bash
+WORDPRESS_DEBUG=true
+WORDPRESS_CONFIG_EXTRA="define('WP_DEBUG_LOG', true); define('WP_DEBUG_DISPLAY', false); define('SCRIPT_DEBUG', true);"
+```
+
+These are container environment variables (read by `wordpress/html/wp-config.php`), not WP-CLI options, so `setup-wordpress.sh` won't pick up the change — recreate the container instead:
+
+```bash
+docker compose up -d --force-recreate wordpress
+```
+
+PHP errors/notices/warnings are then written to `wordpress/html/wp-content/debug.log` (nothing is displayed on screen thanks to `WP_DEBUG_DISPLAY=false`):
+
+```bash
+tail -f wordpress/html/wp-content/debug.log
+```
+
+Set `WORDPRESS_DEBUG=false` and clear `WORDPRESS_CONFIG_EXTRA` (or remove them) and re-run the command above to turn debug mode back off before going back to production use.
 
 ### View container logs
 

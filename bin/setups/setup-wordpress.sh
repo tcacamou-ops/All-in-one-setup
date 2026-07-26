@@ -242,21 +242,21 @@ fi
 
 # Configure all-in-one-download-torr9 credentials
 echo -e "${BLUE}🔑 Configuring all-in-one-download-torr9 credentials...${NC}"
-TORR9_API_KEY="${TORR9_API_KEY:-}"
-TORR9_FULL_TOKEN="${TORR9_FULL_TOKEN:-}"
-if [ -n "$TORR9_API_KEY" ]; then
-    docker exec -u www-data wordpress-app wp option update alli1d_torr9_api_key "$TORR9_API_KEY" \
+TR4KER_API_KEY="${TR4KER_API_KEY:-}"
+TR4KER_FULL_TOKEN="${TR4KER_FULL_TOKEN:-}"
+if [ -n "$TR4KER_API_KEY" ]; then
+    docker exec -u www-data wordpress-app wp option update alli1d_tr4ker_api_key "$TR4KER_API_KEY" \
         --path=/var/www/html
-    echo -e "${GREEN}✓ alli1d_torr9_api_key set${NC}"
+    echo -e "${GREEN}✓ alli1d_tr4ker_api_key set${NC}"
 else
-    echo -e "${YELLOW}⚠️  TORR9_API_KEY not set, skipping${NC}"
+    echo -e "${YELLOW}⚠️  TR4KER_API_KEY not set, skipping${NC}"
 fi
-if [ -n "$TORR9_FULL_TOKEN" ]; then
-    docker exec -u www-data wordpress-app wp option update alli1d_torr9_full_token "$TORR9_FULL_TOKEN" \
+if [ -n "$TR4KER_FULL_TOKEN" ]; then
+    docker exec -u www-data wordpress-app wp option update alli1d_tr4ker_full_token "$TR4KER_FULL_TOKEN" \
         --path=/var/www/html
-    echo -e "${GREEN}✓ alli1d_torr9_full_token set${NC}"
+    echo -e "${GREEN}✓ alli1d_tr4ker_full_token set${NC}"
 else
-    echo -e "${YELLOW}⚠️  TORR9_FULL_TOKEN not set, skipping${NC}"
+    echo -e "${YELLOW}⚠️  TR4KER_FULL_TOKEN not set, skipping${NC}"
 fi
 echo ""
 
