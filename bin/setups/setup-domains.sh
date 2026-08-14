@@ -72,7 +72,6 @@ case $choice in
         echo "127.0.0.1    jellyfin.local"
         echo "127.0.0.1    transmission.local"
         echo "127.0.0.1    wordpress.local"
-        echo "127.0.0.1    npm.local"
         echo ""
 
         read -p "Add them automatically (requires sudo)? (y/n) " -n 1 -r
@@ -82,7 +81,6 @@ case $choice in
                 echo "127.0.0.1    jellyfin.local" | sudo tee -a /etc/hosts > /dev/null
                 echo "127.0.0.1    transmission.local" | sudo tee -a /etc/hosts > /dev/null
                 echo "127.0.0.1    wordpress.local" | sudo tee -a /etc/hosts > /dev/null
-                echo "127.0.0.1    npm.local" | sudo tee -a /etc/hosts > /dev/null
                 echo -e "${GREEN}✓ Entries added to /etc/hosts${NC}"
             else
                 echo -e "${YELLOW}⚠️  Entries already exist in /etc/hosts${NC}"
@@ -95,9 +93,7 @@ case $choice in
         echo -e "${GREEN}✓ Local setup complete${NC}"
         echo ""
         echo -e "${BLUE}📋 Next steps:${NC}"
-        echo "1. Open Nginx Proxy Manager: http://localhost:81"
-        echo "2. Default credentials: admin@example.com / changeme"
-        echo "3. Re-run auto-setup.sh to regenerate the Caddyfile"
+        echo "1. Re-run auto-setup.sh to regenerate the Caddyfile"
         echo ""
         ;;
 
@@ -175,12 +171,6 @@ case $choice in
         else
             echo -e "${RED}✗ WordPress: unreachable${NC}"
         fi
-
-        if curl -s -o /dev/null -w "%{http_code}" http://localhost:81 | grep -q "200\|302\|301"; then
-            echo -e "${GREEN}✓ Nginx Proxy Manager: OK${NC}"
-        else
-            echo -e "${RED}✗ Nginx Proxy Manager: unreachable${NC}"
-        fi
         echo ""
         ;;
 
@@ -206,18 +196,12 @@ case $choice in
         echo "• Transmission:    http://localhost:9091"
         echo ""
 
-        echo -e "${BLUE}🔑 Default credentials:${NC}"
-        echo ""
-        echo "Nginx Proxy Manager:"
-        echo "  Email:    admin@example.com"
-        echo "  Password: changeme"
-        echo "  (Change on first login)"
-        echo ""
-
         if [ -f "$ROOT_DIR/.env" ]; then
+            echo -e "${BLUE}🔑 Credentials:${NC}"
+            echo ""
             echo "Transmission:"
             echo "  User:     $(grep TRANSMISSION_USER "$ROOT_DIR/.env" | cut -d'=' -f2)"
-            echo "  Password: $(grep TRANSMISSION_PASS "$ROOT_DIR/.env" | cut -d'=' -f2)"
+            echo "  Password: (see TRANSMISSION_PASS in .env)"
             echo ""
         fi
 

@@ -1,6 +1,6 @@
 #!/bin/bash
 # WordPress initialization script
-# Uses WP-CLI to install and configure WordPress (always latest version via wordpress:latest image)
+# Uses WP-CLI to install and configure WordPress (image version pinned in docker-compose.yml)
 
 set -e
 
@@ -82,14 +82,22 @@ echo -e "${GREEN}✓ MySQL is ready${NC}"
 echo ""
 
 # Install WP-CLI inside the container (download only if not already present)
+# WP-CLI publishes an official SHA-256 checksum alongside the phar; verify it
+# before trusting the binary (mitigates a compromised/MITM'd download).
 echo -e "${BLUE}📦 Installing WP-CLI...${NC}"
 docker exec wordpress-app bash -c "
     if ! command -v wp > /dev/null 2>&1; then
+        set -e
         curl -sSL https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar \
-            -o /usr/local/bin/wp && chmod +x /usr/local/bin/wp
+            -o /tmp/wp-cli.phar
+        curl -sSL https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar.sha256 \
+            -o /tmp/wp-cli.phar.sha256
+        echo \"\$(cat /tmp/wp-cli.phar.sha256)  /tmp/wp-cli.phar\" | sha256sum -c -
+        mv /tmp/wp-cli.phar /usr/local/bin/wp && chmod +x /usr/local/bin/wp
+        rm -f /tmp/wp-cli.phar.sha256
     fi
 "
-echo -e "${GREEN}✓ WP-CLI ready${NC}"
+echo -e "${GREEN}✓ WP-CLI ready (checksum verified)${NC}"
 echo ""
 
 # Check if WordPress is already installed
@@ -114,8 +122,8 @@ fi
 echo ""
 
 # Ensure WordPress core is at the latest version
-# (wordpress:latest image tracks the latest release, but an update may be available
-#  if the image was pulled some time ago)
+# (the docker-compose.yml image tag is pinned to a specific release; this catches
+#  minor/security core updates released after that image was pulled)
 echo -e "${BLUE}🔄 Checking for WordPress core updates...${NC}"
 WP_UPDATE_OUTPUT=$(docker exec -u www-data wordpress-app wp core update --path=/var/www/html 2>&1 || true)
 if echo "$WP_UPDATE_OUTPUT" | grep -q "Success: WordPress is up to date"; then
@@ -127,6 +135,13 @@ else
     echo -e "${YELLOW}⚠️  Core update check: $WP_UPDATE_OUTPUT${NC}"
 fi
 echo ""
+
+# NOTE on supply-chain integrity: the tcacamou-ops GitHub releases below do not
+# currently publish a SHA-256 checksum/signature alongside the plugin zips, so
+# there is nothing to verify them against yet. Adding real checksum verification
+# here requires the release pipeline (CI) to start publishing a checksum file
+# first — that is out of scope for this script. WP-CLI, which does publish an
+# official checksum, is verified above.
 
 # Install / update all-in-one-download plugin (latest GitHub release)
 echo -e "${BLUE}🔌 Installing all-in-one-download plugin...${NC}"

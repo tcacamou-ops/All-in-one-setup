@@ -465,7 +465,7 @@ def main():
     
     print(f"  • User:     {jellyfin_user}")
     if jellyfin_password:
-        print(f"  • Password: {jellyfin_password}")
+        print(f"  • Password: (see JELLYFIN_ADMIN_PASSWORD in .env)")
     else:
         print(f"  • Password: (not set)")
     print()

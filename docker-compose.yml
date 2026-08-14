@@ -1,7 +1,7 @@
 services:
   # Jellyfin Media Server
   jellyfin:
-    image: jellyfin/jellyfin:latest
+    image: jellyfin/jellyfin:10.11.11
     container_name: jellyfin
     environment:
       - PUID=${PUID:-1000}
@@ -26,7 +26,7 @@ services:
 
   # Transmission Torrent Client
   transmission:
-    image: linuxserver/transmission:latest
+    image: linuxserver/transmission:4.1.3
     container_name: transmission
     environment:
       - PUID=${PUID:-1000}
@@ -53,7 +53,7 @@ services:
   # Docker Socket Proxy — exposes the Docker socket over TCP with minimal permissions
   # Ofelia connects to this proxy instead of the socket directly (avoids host root access)
   docker-socket-proxy:
-    image: tecnativa/docker-socket-proxy:latest
+    image: tecnativa/docker-socket-proxy:v0.5.0
     container_name: docker-socket-proxy
     environment:
       - LOG_LEVEL=warning
@@ -69,7 +69,7 @@ services:
 
   # Cron Job Manager (Ofelia)
   cron:
-    image: mcuadros/ofelia:latest
+    image: mcuadros/ofelia:0.3.22
     container_name: cron-manager
     depends_on:
       - wordpress
@@ -107,11 +107,11 @@ services:
       - no-new-privileges:true
     restart: unless-stopped
     networks:
-      - wordpress-network
+      - db-network
 
   # WordPress Application
   wordpress:
-    image: wordpress:latest
+    image: wordpress:7.0.2-php8.3-apache
     container_name: wordpress-app
     depends_on:
       mysql:
@@ -134,10 +134,11 @@ services:
     restart: unless-stopped
     networks:
       - wordpress-network
+      - db-network
 
   # Caddy — reverse proxy with automatic HTTPS (Let's Encrypt)
   caddy:
-    image: caddy:latest
+    image: caddy:2.11.4
     container_name: caddy
     depends_on:
       - jellyfin
@@ -166,6 +167,9 @@ networks:
   socket-proxy-network:
     driver: bridge
     internal: true  # no Internet access — internal network only
+  db-network:
+    driver: bridge
+    internal: true  # no Internet access — MySQL reachable only from wordpress, not from transmission/cron
 
 volumes:
   jellyfin-config:

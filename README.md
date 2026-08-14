@@ -414,15 +414,16 @@ All-in-one-setup/
 
 ## Network Architecture
 
-Three Docker networks are created:
+Four Docker networks are created:
 
 | Network | Services | Notes |
 |---------|----------|-------|
 | `media-network` | Jellyfin, Transmission, Caddy, Ofelia | Standard bridge |
-| `wordpress-network` | WordPress, MySQL, Caddy, Ofelia | Standard bridge |
+| `wordpress-network` | WordPress, Transmission, Caddy, Ofelia | Standard bridge — HTTP/REST traffic only, no MySQL |
+| `db-network` | WordPress, MySQL | Internal only (no Internet) — MySQL is not reachable from Transmission or Ofelia |
 | `socket-proxy-network` | Ofelia ↔ docker-socket-proxy | Internal only (no Internet) |
 
-Caddy bridges `media-network` and `wordpress-network` to reach all services. Ofelia connects to the Docker daemon through `docker-socket-proxy` over TCP instead of mounting `/var/run/docker.sock` directly.
+Caddy bridges `media-network` and `wordpress-network` to reach all services. Ofelia connects to the Docker daemon through `docker-socket-proxy` over TCP instead of mounting `/var/run/docker.sock` directly. MySQL is isolated on its own internal `db-network`, shared only with WordPress — Transmission (exposed on the public BitTorrent port 51413) has no network path to the database, even though it still shares `wordpress-network` with WordPress for the plugin's REST API calls.
 
 ## Troubleshooting
 
